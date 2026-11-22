@@ -1,35 +1,51 @@
 PostgreSQL 18 Local — Catálogo de Modelos de Comprovante
 
+Pré-requisito: .env na raiz do repositório (copie de .env.example). O nome do banco e do usuário vêm de lá.
+Carregar as variáveis na sessão (a partir de infra/local/postgres):
+  set -a; . ../../../.env; set +a
+
 Subir o ambiente (com build):
   docker compose --env-file ../../../.env -f postgres-db-v18.yml up -d --build
 
 Verificar que subiu (aguardar "healthy"):
   docker compose --env-file ../../../.env -f postgres-db-v18.yml ps
 
-Validar o catálogo (executar script de verificação):
-  docker exec -i postgres18-receiptsio psql -v ON_ERROR_STOP=1 -U docker -d db-receiptsio < verificar-catalogo.sql
+Validar o catálogo (regras de dados, 75 cenários em transação revertida):
+  docker exec -i postgres18-receiptsio psql -v ON_ERROR_STOP=1 -U "$DB_USER_NAME" -d "$DB_NAME" < verificar-catalogo.sql
   echo "Código de saída: $?"
-  # Esperado: todos os cenários OK, código 0
+  # Esperado: "Cenários: 75  OK: 75  FALHA: 0" e código 0 (código 3 se algum cenário falhar)
 
-Conectar ao banco (superusuário):
-  docker exec -it postgres18-receiptsio psql -U docker -d db-receiptsio
+Validar a concorrência (publicar modelo x editar template, duas sessões reais, ~10 s):
+  ./verificar-concorrencia.sh
+  echo "Código de saída: $?"
+  # Esperado: "VERIFICAÇÃO DE CONCORRÊNCIA OK" e código 0
 
-Conectar como role leitura (cache):
-  docker exec -it postgres18-receiptsio psql -U catalogo_leitura -d db-receiptsio
-  # Pedir senha: DB_CATALOGO_LEITURA_PASSWORD do .env
+Inspecionar o seed (COMPPIX v1 INATIVO/v2 ATIVO/v3 RASCUNHO, COMPTED, COMPBOL v1 ATIVO/v2 RASCUNHO sem indexador 1):
+  docker exec -it postgres18-receiptsio psql -U "$DB_USER_NAME" -d "$DB_NAME"
+  # SELECT id_modelo, versao, situacao FROM catalogo.modelo ORDER BY 1, 2;
+  # SELECT * FROM catalogo.vw_modelo_completo WHERE id_modelo = 'COMPPIX' AND versao = 2;
+  # UPDATE catalogo.modelo SET situacao = 'ATIVO' WHERE id_modelo = 'COMPBOL' AND versao = 2;   -- deve ser rejeitado
 
-Conectar como role escrita (administração):
-  docker exec -it postgres18-receiptsio psql -U catalogo_escrita -d db-receiptsio
-  # Pedir senha: DB_CATALOGO_ESCRITA_PASSWORD do .env
+Rodar os exemplos de consulta (transação revertida, não altera o banco):
+  docker exec -i postgres18-receiptsio psql -v ON_ERROR_STOP=1 -U "$DB_USER_NAME" -d "$DB_NAME" < exemplos-queries.sql
+
+Conectar como role leitura (cache) ou escrita (administração):
+  docker exec -it postgres18-receiptsio psql -U catalogo_leitura -d "$DB_NAME"
+  docker exec -it postgres18-receiptsio psql -U catalogo_escrita -d "$DB_NAME"
+  # Dentro do container não pede senha (trust local). Pelo host/rede a senha é DB_CATALOGO_LEITURA_PASSWORD
+  # ou DB_CATALOGO_ESCRITA_PASSWORD, do .env.
 
 Parar o ambiente:
   docker compose --env-file ../../../.env -f postgres-db-v18.yml down
 
-Parar e remover volume (limpar dados, recriar tudo):
+Parar e remover volume (limpar dados, recriar tudo — migrations e seed rodam de novo):
   docker compose --env-file ../../../.env -f postgres-db-v18.yml down -v
   docker compose --env-file ../../../.env -f postgres-db-v18.yml up -d --build
 
 Ver logs:
   docker logs postgres18-receiptsio
 
-Veja README.md para documentação completa.
+Observação: não há trigger de auditoria. O banco preenche data_hora_criacao/data_hora_atualizacao só no INSERT;
+a aplicação renova data_hora_atualizacao e data_version (lock otimista) em cada UPDATE.
+
+Veja README.md para documentação completa e explicacao.md para a explicação do modelo.

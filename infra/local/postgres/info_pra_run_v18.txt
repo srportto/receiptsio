@@ -1,0 +1,35 @@
+PostgreSQL 18 Local — Catálogo de Modelos de Comprovante
+
+Subir o ambiente (com build):
+  docker compose --env-file ../../../.env -f postgres-db-v18.yml up -d --build
+
+Verificar que subiu (aguardar "healthy"):
+  docker compose --env-file ../../../.env -f postgres-db-v18.yml ps
+
+Validar o catálogo (executar script de verificação):
+  docker exec -i postgres18-receiptsio psql -v ON_ERROR_STOP=1 -U docker -d db-receiptsio < verificar-catalogo.sql
+  echo "Código de saída: $?"
+  # Esperado: todos os cenários OK, código 0
+
+Conectar ao banco (superusuário):
+  docker exec -it postgres18-receiptsio psql -U docker -d db-receiptsio
+
+Conectar como role leitura (cache):
+  docker exec -it postgres18-receiptsio psql -U catalogo_leitura -d db-receiptsio
+  # Pedir senha: DB_CATALOGO_LEITURA_PASSWORD do .env
+
+Conectar como role escrita (administração):
+  docker exec -it postgres18-receiptsio psql -U catalogo_escrita -d db-receiptsio
+  # Pedir senha: DB_CATALOGO_ESCRITA_PASSWORD do .env
+
+Parar o ambiente:
+  docker compose --env-file ../../../.env -f postgres-db-v18.yml down
+
+Parar e remover volume (limpar dados, recriar tudo):
+  docker compose --env-file ../../../.env -f postgres-db-v18.yml down -v
+  docker compose --env-file ../../../.env -f postgres-db-v18.yml up -d --build
+
+Ver logs:
+  docker logs postgres18-receiptsio
+
+Veja README.md para documentação completa.

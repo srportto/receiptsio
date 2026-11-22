@@ -1,0 +1,27 @@
+# Configuracao do OpenSpec para o receiptsio (modelo: skill openspec-catalogo-java, references/config.yaml).
+# O CLI injeta context e rules em `openspec instructions <artefato>`.
+schema: spec-driven
+context: |
+  receiptsio: plataforma de comprovantes com duas divisoes de persistencia.
+  - Relacional (PostgreSQL 18 + cache): catalogo de modelos/templates de comprovante (estrutura, campos, indexadores).
+  - NoSQL: comprovante transacional, que referencia o modelo por (id_modelo, versao) imutavel.
+  Infra local em infra/local/<servico>, orquestrada por Docker Compose; segredos via .env da raiz (.env.example).
+  Aplicacoes Java 25 (sem preview) + Spring Boot 4, arquitetura hexagonal, quando existirem.
+  Skills e agents por fase: skill openspec-catalogo-java, secao "Mapa de fases".
+  AWS local: Floci em http://localhost:4566.
+  Prova = teste/comando executado com saida lida; -DskipTests nunca e prova.
+  Comentarios em codigo e SQL sempre em portugues.
+rules:
+  proposal:
+    - "Refine a demanda com `refinamento-de-historias`: DoR, criterios observaveis, limites de carga e recuperacao."
+    - "Aplicacao nova: declare nome e variante de `criar-aplicacao-java`; diga o que fica fora do escopo."
+  specs:
+    - "Contrato HTTP segue `api-rest-design` (Problem Details, 413/429/503, Idempotency-Key)."
+    - "Autenticacao, autorizacao e abuso de recursos seguem `seguranca-aplicacao-java`."
+  design:
+    - "Decisoes de sistema seguem `design-system-architecture`: capacidade, consistencia e ADR com alternativas."
+    - "Toda dependencia remota ou fila declara limites e protecoes de `resiliencia-controle-fluxo-java`."
+    - "Camadas e portas seguem `arquitetura-limpa-java`; mensageria segue `mensageria-sqs-kafka`."
+  tasks:
+    - "Cada tarefa nomeia a prova (teste e comando) segundo `testes-sistemas-java`; TDD com teste falhando primeiro."
+    - "Se a change altera codigo Java, a ultima tarefa e a auditoria do `java-revisor` com veredicto APROVADO."

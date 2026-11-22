@@ -1,0 +1,77 @@
+Tabelas
+
+	modelo
+		id modelo   					-> String de até 10 bytes (PK)
+		versao 							-> Numerico (max: 999)
+		descricao 						-> String
+		data hora criacao				-> datetime (UTC -3 | Sao Paulo)
+		data hora atualizacao 			-> datetime (UTC -3 | Sao Paulo)
+		id template estrutural			-> Numerico
+		id template variavel			-> Numerico
+
+			
+		Contexto de negocios: todo modelo é composto por um template estrutural  + template variavel 
+		
+		
+	campos
+		id campo  				--> numerico 10 bytes (PK)
+		nome campo 				--> string
+		tipo dado				--> String
+		descricao base			--> Descricao de uso do campo
+		data hora criacao		--> datetime (UTC -3 | Sao Paulo)
+		data hora atualizacao 	--> datetime (UTC -3 | Sao Paulo)
+		
+		Contexto de negocios: Nao pode existir um campo de mesmo nome e mesmo tipo de dado 
+		
+
+
+	template estrutural
+		id template estrutural	-->  UUID-V7 (PK)
+		descricao				-->  String
+		indexador_1				-->  String
+		indexador_2				-->  String
+		indexador_3				-->  String
+		indexador_4				-->  String
+		indexador_5				-->  String
+		data hora criacao		--> datetime (UTC -3 | Sao Paulo)
+		data hora atualizacao 	--> datetime (UTC -3 | Sao Paulo)
+		
+		Contexto de negocios: No template estrutural é preciso sempre preencher o campo do indexador_1, os demais sao opcionais. 
+		
+		
+	template estrutural relacionamento campos
+		id template 					-->  UUID-V7 (PK part1 recebe FK)
+		id campo						-->  Numerico (PK part2 recebe FK)
+		descricao campo em template 	-->  String
+		indicador de campo indexador	-->  Boolean
+		aceita nulo vazio				-->  Boolean
+		data hora criacao				--> datetime (UTC -3 | Sao Paulo)
+		data hora atualizacao 			--> datetime (UTC -3 | Sao Paulo)
+		
+		Contexto de negocios: Um campo indexador nao pode aceitar nulo/vazio 
+		
+		
+		
+		
+	template variavel
+		id template variavel	-->  UUID-V7 (PK)
+		descricao				-->  String 
+		data hora criacao		--> datetime (UTC -3 | Sao Paulo)
+		data hora atualizacao 	--> datetime (UTC -3 | Sao Paulo)
+
+		Contexto de negocios: Nao possui campo indexador  
+		
+	template variavel relacionamento campos
+		id template 					-->  UUID-V7 (PK part1 recebe FK)
+		id campo						-->  Numerico (PK part2 recebe FK)
+		descricao campo em template 	-->  String
+		aceita nulo vazio				-->  Boolean
+		data hora criacao				--> datetime (UTC -3 | Sao Paulo)
+		data hora atualizacao 			--> datetime (UTC -3 | Sao Paulo)
+
+	
+	
+
+	
+
+	

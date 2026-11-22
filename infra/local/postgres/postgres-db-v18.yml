@@ -1,0 +1,52 @@
+services:
+  postgres:
+    build: . # Build the image from the Dockerfile in o diretorio atual
+    image: postgres18-receiptsio-extras-partman_cron_vector:1.0 # PostgreSQL 18 com pg_cron, pg_partman e pgvector
+    command: [
+      "postgres",
+      # Uma unica diretiva com lista: a mesma GUC repetida em dois "-c" nao acumula,
+      # o ultimo valor prevalece e descarta o primeiro sem erro (ver change
+      # unificar-orquestracao-docker-local, D3). Antes desta correcao, pg_partman_bgw
+      # nunca chegou a carregar por nenhum dos dois caminhos de subida do Postgres local.
+      "-c", "shared_preload_libraries=pg_partman_bgw,pg_cron",
+      "-c", "cron.database_name=${DB_NAME:-db-receiptsio}",
+      ]
+    container_name: postgres18-receiptsio
+    environment:
+      POSTGRES_DB: ${DB_NAME:-db-receiptsio}
+      POSTGRES_USER: ${DB_USER_NAME:-docker}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD nao definida - copie .env.example para .env}
+      DB_CATALOGO_LEITURA_PASSWORD: ${DB_CATALOGO_LEITURA_PASSWORD:?DB_CATALOGO_LEITURA_PASSWORD nao definida}
+      DB_CATALOGO_ESCRITA_PASSWORD: ${DB_CATALOGO_ESCRITA_PASSWORD:?DB_CATALOGO_ESCRITA_PASSWORD nao definida}
+      # Optional: Explicitly set PGDATA for clarity or if customizing
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - pg_data:/var/lib/postgresql/data # Mount the named volume to the correct data path
+      - ./migrations:/docker-entrypoint-initdb.d:ro # Scripts rodam em ordem alfabetica (v1.0.0, v1.0.1, ...) na primeira subida do banco
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER_NAME:-docker} -d ${DB_NAME:-db-receiptsio}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - receiptsio_postgres
+    restart: unless-stopped
+    # Catálogo de modelos de comprovante: baixa cardinalidade e escrita rara.
+    # Limites reduzidos comparados ao projeto de origem (que tinha 989 partições).
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+networks:
+  # Nome literal explicito (nao o default implicito derivado do diretorio do projeto):
+  # isolamento de nomes do receiptsio
+  receiptsio_postgres:
+    name: receiptsio_postgres
+
+volumes:
+  pg_data:
+    name: receiptsio_pg_data # Nome literal explicito: isolamento do projeto

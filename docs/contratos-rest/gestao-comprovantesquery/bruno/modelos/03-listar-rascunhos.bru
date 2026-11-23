@@ -1,0 +1,26 @@
+meta {
+  name: Listar rascunhos
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/modelos
+  body: none
+  auth: none
+}
+
+params:query {
+  situacao: RASCUNHO
+}
+
+tests {
+  test("só RASCUNHO", function () {
+    expect(res.status).to.equal(200);
+    res.body.items.forEach(i => expect(i.situacao).to.equal("RASCUNHO"));
+  });
+}
+
+docs {
+  Versões em construção.
+}

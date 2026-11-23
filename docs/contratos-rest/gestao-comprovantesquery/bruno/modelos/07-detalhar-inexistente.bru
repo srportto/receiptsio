@@ -1,0 +1,22 @@
+meta {
+  name: Detalhar inexistente (404)
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/modelos/COMPPIX/versoes/999
+  body: none
+  auth: none
+}
+
+tests {
+  test("404 Problem Details", function () {
+    expect(res.status).to.equal(404);
+    expect(res.headers["content-type"]).to.contain("application/problem+json");
+  });
+}
+
+docs {
+  Versão que não existe no seed.
+}

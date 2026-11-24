@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "gestao-comprovantesquery",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Listar ativos
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/modelos
+  body: none
+  auth: none
+}
+
+params:query {
+  situacao: ATIVO
+}
+
+tests {
+  test("só ATIVO", function () {
+    expect(res.status).to.equal(200);
+    res.body.items.forEach(i => expect(i.situacao).to.equal("ATIVO"));
+  });
+}
+
+docs {
+  Versões publicadas e vigentes (no máximo uma por idModelo).
+}

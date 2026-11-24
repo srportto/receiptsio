@@ -1,0 +1,26 @@
+meta {
+  name: Listar por idModelo
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/modelos
+  body: none
+  auth: none
+}
+
+params:query {
+  idModelo: {{idModelo}}
+}
+
+tests {
+  test("todas as versões do modelo", function () {
+    expect(res.status).to.equal(200);
+    res.body.items.forEach(i => expect(i.idModelo).to.equal(bru.getEnvVar("idModelo")));
+  });
+}
+
+docs {
+  Versão opcional: sem versao, devolve todas as versões do modelo.
+}

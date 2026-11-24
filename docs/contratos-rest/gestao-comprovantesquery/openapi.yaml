@@ -1,0 +1,292 @@
+openapi: 3.1.0
+info:
+  title: gestao-comprovantesquery
+  version: 1.0.0
+  description: |
+    API REST **somente leitura** do catálogo de modelos de comprovante (schema `catalogo` do PostgreSQL).
+    Atende a tela web de administração: listar, filtrar e detalhar modelos com seus campos.
+
+    Este arquivo é a **fonte da verdade do contrato**. A aplicação não carrega anotações OpenAPI:
+    ela implementa este contrato, e os testes de contrato o validam.
+
+    Fora de escopo: autenticação, autorização e CORS (responsabilidade da camada web/gateway)
+    e qualquer operação de escrita.
+
+    Erros seguem a RFC 9457 (`application/problem+json`).
+servers:
+  - url: http://localhost:9080
+    description: Execução local
+tags:
+  - name: Modelos
+    description: Consulta de modelos de comprovante
+
+paths:
+  /modelos:
+    get:
+      tags: [Modelos]
+      operationId: listarModelos
+      summary: Lista simples de modelos (paginada)
+      description: |
+        Todos os filtros são opcionais e combináveis (E lógico). Sem nenhum filtro, lista todos os modelos,
+        em qualquer situação. Ordenação fixa: `idModelo` crescente e `versao` decrescente.
+      parameters:
+        - name: situacao
+          in: query
+          required: false
+          description: Filtra pela situação. Ausente = todas.
+          schema: { $ref: '#/components/schemas/Situacao' }
+        - name: idModelo
+          in: query
+          required: false
+          description: Filtra pelo código do modelo (igualdade exata).
+          schema: { $ref: '#/components/schemas/IdModelo' }
+        - name: versao
+          in: query
+          required: false
+          description: Filtra pela versão de negócio. Combinada com `idModelo` identifica um único modelo.
+          schema: { $ref: '#/components/schemas/Versao' }
+        - name: page
+          in: query
+          required: false
+          description: Número da página, a partir de 1.
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: size
+          in: query
+          required: false
+          description: Itens por página.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Página de modelos (pode ser vazia).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaModelos' }
+              examples:
+                ativos:
+                  summary: ?situacao=ATIVO&size=2
+                  value:
+                    items:
+                      - { idModelo: COMPBOL, versao: 1, descricao: Comprovante de boleto, situacao: ATIVO, dataHoraAtualizacao: '2026-11-22T15:00:00-03:00' }
+                      - { idModelo: COMPPIX, versao: 2, descricao: Comprovante de PIX, situacao: ATIVO, dataHoraAtualizacao: '2026-11-22T15:00:00-03:00' }
+                    pagination: { page: 1, size: 2, totalElements: 3, totalPages: 2 }
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+        '500': { $ref: '#/components/responses/ErroInterno' }
+        '503': { $ref: '#/components/responses/Indisponivel' }
+
+  /modelos/{idModelo}/versoes/{versao}:
+    get:
+      tags: [Modelos]
+      operationId: detalharModelo
+      summary: Detalha um modelo com todos os seus campos
+      description: |
+        Devolve o modelo e os campos dos dois templates (estrutural e variável), ordenados por `ordem`.
+        Funciona para qualquer situação (rascunho, ativo ou inativo).
+      parameters:
+        - name: idModelo
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/IdModelo' }
+        - name: versao
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/Versao' }
+      responses:
+        '200':
+          description: Modelo encontrado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModeloDetalhe' }
+              examples:
+                compbol-v2:
+                  summary: Rascunho sem indexador 1
+                  value:
+                    idModelo: COMPBOL
+                    versao: 2
+                    descricao: Comprovante de boleto (rascunho)
+                    situacao: RASCUNHO
+                    dataHoraCriacao: '2026-11-22T15:00:00-03:00'
+                    dataHoraAtualizacao: '2026-11-22T15:00:00-03:00'
+                    templateEstrutural:
+                      idTemplate: 0190a1b2-0000-7000-8000-000000000001
+                      nome: Estrutura BOLETO v2
+                      campos:
+                        - { idCampo: 12, nomeCampo: linha_digitavel, tipoDado: TEXTO, ordem: 1, aceitaNuloVazio: false, posicaoIndexador: 2, descricaoCampoTemplate: null, descricaoBase: Linha digitável do boleto, descricaoEfetiva: Linha digitável do boleto }
+                    templateVariavel:
+                      idTemplate: 0190a1b2-0000-7000-8000-000000000002
+                      nome: Variável BOLETO v2
+                      campos: []
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '500': { $ref: '#/components/responses/ErroInterno' }
+        '503': { $ref: '#/components/responses/Indisponivel' }
+
+components:
+  schemas:
+    Situacao:
+      type: string
+      enum: [RASCUNHO, ATIVO, INATIVO]
+      description: RASCUNHO = em construção; ATIVO = publicado e vigente; INATIVO = publicado e retirado.
+    IdModelo:
+      type: string
+      pattern: '^[A-Z0-9_]{1,10}$'
+      example: COMPPIX
+    Versao:
+      type: integer
+      minimum: 1
+      maximum: 999
+      example: 2
+    TipoDado:
+      type: string
+      enum: [TEXTO, INTEIRO, DECIMAL, DATA, DATA_HORA, BOOLEANO, UUID]
+
+    ModeloResumo:
+      type: object
+      required: [idModelo, versao, descricao, situacao, dataHoraAtualizacao]
+      properties:
+        idModelo: { $ref: '#/components/schemas/IdModelo' }
+        versao: { $ref: '#/components/schemas/Versao' }
+        descricao: { type: string }
+        situacao: { $ref: '#/components/schemas/Situacao' }
+        dataHoraAtualizacao: { type: string, format: date-time }
+
+    Pagination:
+      type: object
+      required: [page, size, totalElements, totalPages]
+      properties:
+        page: { type: integer, minimum: 1, description: Página atual (a partir de 1). }
+        size: { type: integer, minimum: 1, maximum: 100, description: Itens por página solicitados. }
+        totalElements: { type: integer, format: int64, minimum: 0, description: Total de itens no filtro. }
+        totalPages: { type: integer, minimum: 0, description: Total de páginas (0 quando não há itens). }
+
+    PaginaModelos:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ModeloResumo' }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+
+    CampoEstrutural:
+      type: object
+      required: [idCampo, nomeCampo, tipoDado, ordem, aceitaNuloVazio, posicaoIndexador, descricaoCampoTemplate, descricaoBase, descricaoEfetiva]
+      properties:
+        idCampo: { type: integer, format: int64 }
+        nomeCampo: { type: string }
+        tipoDado: { $ref: '#/components/schemas/TipoDado' }
+        ordem: { type: integer, minimum: 1 }
+        aceitaNuloVazio: { type: boolean }
+        posicaoIndexador:
+          type: [integer, 'null']
+          description: Posição do indexador (1 a 5). Nulo quando o campo não é indexador.
+        descricaoCampoTemplate: { type: [string, 'null'], description: Descrição própria do campo neste template. }
+        descricaoBase: { type: [string, 'null'], description: Descrição padrão do campo. }
+        descricaoEfetiva: { type: [string, 'null'], description: descricaoCampoTemplate, ou descricaoBase quando aquela é nula. }
+
+    CampoVariavel:
+      type: object
+      required: [idCampo, nomeCampo, tipoDado, ordem, aceitaNuloVazio, descricaoCampoTemplate, descricaoBase, descricaoEfetiva]
+      properties:
+        idCampo: { type: integer, format: int64 }
+        nomeCampo: { type: string }
+        tipoDado: { $ref: '#/components/schemas/TipoDado' }
+        ordem: { type: integer, minimum: 1 }
+        aceitaNuloVazio: { type: boolean }
+        descricaoCampoTemplate: { type: [string, 'null'] }
+        descricaoBase: { type: [string, 'null'] }
+        descricaoEfetiva: { type: [string, 'null'] }
+
+    TemplateEstrutural:
+      type: object
+      required: [idTemplate, nome, campos]
+      properties:
+        idTemplate: { type: string, format: uuid }
+        nome: { type: string }
+        campos:
+          type: array
+          items: { $ref: '#/components/schemas/CampoEstrutural' }
+
+    TemplateVariavel:
+      type: object
+      required: [idTemplate, nome, campos]
+      properties:
+        idTemplate: { type: string, format: uuid }
+        nome: { type: string }
+        campos:
+          type: array
+          items: { $ref: '#/components/schemas/CampoVariavel' }
+
+    ModeloDetalhe:
+      type: object
+      required: [idModelo, versao, descricao, situacao, dataHoraCriacao, dataHoraAtualizacao, templateEstrutural, templateVariavel]
+      properties:
+        idModelo: { $ref: '#/components/schemas/IdModelo' }
+        versao: { $ref: '#/components/schemas/Versao' }
+        descricao: { type: string }
+        situacao: { $ref: '#/components/schemas/Situacao' }
+        dataHoraCriacao: { type: string, format: date-time }
+        dataHoraAtualizacao: { type: string, format: date-time }
+        templateEstrutural: { $ref: '#/components/schemas/TemplateEstrutural' }
+        templateVariavel: { $ref: '#/components/schemas/TemplateVariavel' }
+
+    ProblemDetails:
+      type: object
+      description: Problem Details (RFC 9457).
+      required: [title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: 'about:blank'
+          description: Tipo do problema. Pode vir omitido, o que equivale a `about:blank` (RFC 9457, seção 3.1.1).
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        errors:
+          type: array
+          description: Presente apenas em 400, um item por parâmetro inválido.
+          items:
+            type: object
+            required: [parametro, mensagem]
+            properties:
+              parametro: { type: string, example: size }
+              mensagem: { type: string, example: deve ser no máximo 100 }
+
+  responses:
+    RequisicaoInvalida:
+      description: Parâmetro inválido (situacao desconhecida, size acima de 100, idModelo fora do padrão etc.).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+          example:
+            type: about:blank
+            title: Requisição inválida
+            status: 400
+            detail: Um ou mais parâmetros são inválidos.
+            errors:
+              - { parametro: size, mensagem: deve ser no máximo 100 }
+    NaoEncontrado:
+      description: Não existe modelo com o idModelo e a versao informados.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+          example:
+            type: about:blank
+            title: Modelo não encontrado
+            status: 404
+            detail: Não existe o modelo COMPPIX versão 99.
+    ErroInterno:
+      description: Falha inesperada. O detalhe interno não é exposto.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Indisponivel:
+      description: Banco indisponível ou consulta acima do tempo limite.
+      headers:
+        Retry-After:
+          description: Segundos até tentar novamente.
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }

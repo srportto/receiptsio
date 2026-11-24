@@ -1,7 +1,7 @@
 # Sumário de Implementação: Catálogo de Modelos de Comprovante (PostgreSQL local)
 
 **Repositório:** receiptsio · **Banco:** PostgreSQL 18 em Docker (`infra/local/postgres`)
-**Estado:** ✅ implementado, corrigido e comprovado (2026-11-22)
+**Estado:** ✅ catálogo implementado, corrigido e comprovado; API de consulta `gestao-comprovantesquery` implementada (2026-11-22)
 
 Duas changes OpenSpec construíram o catálogo. A segunda existe porque a primeira foi arquivada com todas as tarefas marcadas, mas um banco que **não subia** (validação real em 2026-11-22).
 
@@ -102,9 +102,36 @@ Cinco grupos, 18 tarefas: limpeza da infra legada e isolamento de nomes; verific
 3. O volume legado `postgres_pg_data` do projeto de origem não é tocado.
 4. A infra só roda as migrations com volume vazio: editar uma migration exige `down -v` + `up`. Quando existir ambiente com dados ou aplicação, passam a valer migrations incrementais (Flyway/Liquibase).
 
-## 6. Próximos passos (fora de escopo)
+## 6. Aplicação de consulta: `gestao-comprovantesquery` (change `gestao-comprovantesquery`)
+
+API REST **somente leitura** do catálogo, para a tela web de administração (`apps/gestao-comprovantesquery`).
+Java 25 + Spring Boot 4, hexagonal, `JdbcClient` com SQL explícito. Detalhes e comandos em
+`apps/gestao-comprovantesquery/README.md`.
+
+- **Rotas:** `GET /modelos` (filtros opcionais `situacao`, `idModelo`, `versao`; paginação por offset com o objeto `Pagination`,
+  `size` máx. 100) e `GET /modelos/{idModelo}/versoes/{versao}` (modelo + campos estruturais e variáveis). Sem `situacao`, lista tudo.
+- **Contrato fora do código:** `docs/contratos-rest/gestao-comprovantesquery/` (`openapi.yaml` + coleção Bruno). A aplicação não tem
+  anotações OpenAPI; cada resposta dos testes é validada contra os schemas do `openapi.yaml`.
+- **Somente leitura em duas camadas:** role `catalogo_leitura` (só `SELECT`, `42501` em escrita) e sessão `read-only`
+  (`readOnlyMode=always`). Sem rota de escrita (405).
+- **Sem segurança embutida:** sem Spring Security, autenticação ou CORS (camada web/gateway).
+- **Limites:** pool de 10 conexões (espera 2 s), `query-timeout` de 5 s, `size` ≤ 100; falhas viram 503 com `Retry-After`;
+  erros em RFC 9457 sem vazamento de SQL, tabela ou pilha.
+- **Achados da implementação:** (1) o binder do Boot deixa `${VARIAVEL}` ausente como texto: `VerificaConfiguracaoBanco` passou a
+  falhar na subida nomeando a variável; (2) com `autocommit`, o pgjdbc só aplica `read-only` dentro de transação: `readOnlyMode=always`;
+  (3) o Postgres checa privilégio antes de `read-only`, então a role e a sessão são provadas separadamente; (4) o Boot omite
+  `type` (`about:blank`) em Problem Details: o contrato passou a seguir a RFC 9457 (`type` opcional); (5) a porta 8080 cai em
+  faixa reservada do Windows nesta máquina: padrão `9080` (`SERVER_PORT`).
+- **Provas (2026-11-22):** `mvn clean verify` com 106 testes verdes (Testcontainers sobre a imagem real do catálogo, migrations e seed);
+  prova negativa do contrato (alterar o `openapi.yaml` derruba 9 testes de API); aplicação real contra o banco do compose lida
+  pela rede com a senha da role; coleção Bruno 8/8 por runner local equivalente (o CLI do Bruno não foi executado: a instalação via
+  `npx` foi negada pelo ambiente; rode `bru run modelos --env local` na pasta `bruno`).
+- **Não incluído:** `Dockerfile`/pipeline da aplicação e auditoria do agente `java-revisor` (ver pendências da change).
+
+## 7. Próximos passos (fora de escopo)
 
 1. Aplicação Java de administração com a role `catalogo_escrita`: `@Version` em `data_version`, `@UpdateTimestamp` em `data_hora_atualizacao`, `@Column(updatable = false)` em `data_hora_criacao`, `OPTIMISTIC_FORCE_INCREMENT` no template ao editar associações e repetição da transação em `40P01`.
 2. Carregador de cache (Redis/Valkey) com a role `catalogo_leitura`, lendo `vw_modelo_completo` só de versões publicadas.
 3. Emissão de comprovante (NoSQL) referenciando `(id_modelo, versao)`.
-4. CI com os dois verificadores de banco.
+4. CI com os dois verificadores de banco e o `mvn verify` da `gestao-comprovantesquery` (exige a imagem do banco construída).
+5. `Dockerfile` e pipeline da `gestao-comprovantesquery`.

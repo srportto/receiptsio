@@ -1,0 +1,23 @@
+meta {
+  name: Detalhar modelo
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/modelos/{{idModelo}}/versoes/{{versao}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("detalhe com campos dos dois templates", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.templateEstrutural.campos).to.be.an("array");
+    expect(res.body.templateVariavel.campos).to.be.an("array");
+  });
+}
+
+docs {
+  Modelo completo com campos estruturais (com indexadores) e variáveis, ordenados por ordem.
+}

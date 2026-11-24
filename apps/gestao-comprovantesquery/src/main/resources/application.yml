@@ -1,0 +1,55 @@
+# API somente leitura do catálogo. Tudo que varia por ambiente vem do ambiente (.env da raiz), sem valor fixo aqui.
+spring:
+  application:
+    name: gestao-comprovantesquery
+  profiles:
+    default: local
+  lifecycle:
+    timeout-per-shutdown-phase: 30s   # graceful shutdown: termina requisições em voo antes de encerrar
+  datasource:
+    # Host e porta têm padrão local; nome do banco e senha são obrigatórios (placeholder sem padrão).
+    # VerificaConfiguracaoBanco derruba a subida nomeando a variável ausente, sem imprimir valores.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME}
+    # Role do catálogo só com SELECT: o banco impede escrita mesmo que a aplicação tentasse (design D7)
+    username: catalogo_leitura
+    password: ${DB_CATALOGO_LEITURA_PASSWORD}
+    hikari:
+      maximum-pool-size: 10        # somar réplicas x 10 contra max_connections do banco (design D8)
+      connection-timeout: 2000     # ms; pool esgotado vira 503 em até 2 s
+      read-only: true              # segunda camada de somente leitura
+      data-source-properties:
+        readOnlyMode: always       # sessão read-only mesmo com autocommit (o padrão só vale dentro de transação)
+      initialization-fail-timeout: -1   # a aplicação sobe sem o banco; a falta dele vira 503 por requisição
+  jdbc:
+    template:
+      query-timeout: 5s            # consulta acima disso vira 503 e a conexão volta ao pool
+
+server:
+  port: ${SERVER_PORT:9080}   # 8080 cai em faixa reservada do Windows (Hyper-V/WSL) em algumas máquinas
+  shutdown: graceful
+  max-http-request-header-size: 16KB
+
+# Logs estruturados (JSON, uma linha por evento)
+logging:
+  structured:
+    format:
+      console: logstash
+  level:
+    root: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      probes:
+        enabled: true        # liveness/readiness também fora do Kubernetes
+      group:
+        liveness:
+          include: livenessState    # só o processo
+        readiness:
+          include: readinessState   # banco compartilhado fica fora: a falta dele não tira a réplica do ar
+        dependencias:
+          include: db               # estado do banco, para diagnóstico (GET /actuator/health/dependencias)

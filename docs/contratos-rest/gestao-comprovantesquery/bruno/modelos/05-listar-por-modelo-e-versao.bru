@@ -1,0 +1,27 @@
+meta {
+  name: Listar por idModelo e versao
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/modelos
+  body: none
+  auth: none
+}
+
+params:query {
+  idModelo: {{idModelo}}
+  versao: {{versao}}
+}
+
+tests {
+  test("no máximo um item", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.items.length).to.be.at.most(1);
+  });
+}
+
+docs {
+  idModelo e versao identificam um único modelo.
+}

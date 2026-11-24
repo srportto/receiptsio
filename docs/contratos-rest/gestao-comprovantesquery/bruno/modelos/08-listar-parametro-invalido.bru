@@ -1,0 +1,27 @@
+meta {
+  name: Listar com parâmetro inválido (400)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/modelos
+  body: none
+  auth: none
+}
+
+params:query {
+  situacao: XYZ
+  size: 500
+}
+
+tests {
+  test("400 Problem Details com errors", function () {
+    expect(res.status).to.equal(400);
+    expect(res.body.errors).to.be.an("array");
+  });
+}
+
+docs {
+  situacao desconhecida e size acima do teto (100).
+}
